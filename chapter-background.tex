@@ -1,0 +1,433 @@
+\chapter{Background}\label{chap:background}
+To predict the next activity in a running case, we bring together the domains of process science, predictive modeling and deep learning. This background chapter gives comprehensive insights into the parts of each domain that are used and referenced throughout this thesis. The chapter approaches them in a top-down fashion, starting with the high-level perspective from process science and how process mining is distinguished from predictive process monitoring in \autoref{sec:process-science}. The section ends with information on how the process logs usually come into existence and which requirements these logs need to fulfill to be used in a prediction scenario.
+With the data origin explained, \autoref{sec:predictive-modeling} introduces a process along which predictive model development typically takes place.
+\autoref{sec:artificial-neural-networks} gives an in-depth look at neural networks and the components relevant to this thesis.
+Long short-term memory is also explained in detail.
+Finally, \autoref{sec:background:feature-engineering} introduces the peculiarities encountered when dealing with sequential data and introduces popular approaches for feature engineering.
+
+\section{Process Science}\label{sec:process-science}
+Business processes are a collection of structured tasks which serve a particular business goal if ordered in a specific sequence~\cite{weske2012business}. To facilitate a common understanding, processes are visualized with modeling languages~\cite{panagacos2012ultimate}. Most languages, for example the Business Process Modeling Notation (BPMN)~\cite{bpmn2.0}, model the process flow in steps, commonly referred to as \textit{activities} - shown in \autoref{fig:activity-introduction}. An instance of a process is referred to as \textit{case}.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=.75\textwidth]{gfx/activity-sequence.png}
+    \caption[Control flow in BPMN]{The boxes and their description are used in BPMN to describe an activity, the arrows inbetween denote the control flow}
+    \label{fig:activity-introduction}
+\end{figure}
+
+Process science, as loosely defined by van der Aalst~\cite{Aalst2016}, refers to the "broader discipline that combines knowledge from information technology and knowledge from management sciences to improve and run operational processes".
+
+With the help of workflow management systems (WFMS), it is possible to embed and enforce business processes in an organization. When an activity in a process is executed, it goes through different stages. These stages are captured in the activity lifecycle in \autoref{fig:activity-lifecycle}. WFMS log state transitions related to each activity as events. The types of captured events are specific to the modeling language and the execution environment of the WFMS.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=.9\textwidth]{gfx/activityLifeCycle.pdf}
+    \caption{The activity lifecycle}
+    \label{fig:activity-lifecycle}
+\end{figure}
+
+The event logs give rise to the disciplines of process mining and predictive process monitoring. These disciplines revolve around analyzing the information contained in those logs~\cite{Aalst2016}. Because of the paramount importance of logs for this work, we begin this chapter a definition of the properties and structure of a log in \autoref{sec:log-structure}. The following \autoref{sec:process-mining} and \autoref{sec:predictive-process-monitoring} contrast process mining and predictive process monitoring.
+
+\subsection{Process Logs}\label{sec:log-structure}
+A process log tracks the execution history of a process and can be understood in a hierarchical manner. Each log of a process consists of cases, which represent instances of a process. A case itself consists of a trace of events, i.e., a sequence that only belongs to a single case. Each event can have attributes attached~\cite{Aalst2016}.
+
+\begin{figure}
+    \centering
+    \begin{adjustbox}{center}
+    \includegraphics[width=1\textwidth]{gfx/process-log.png}
+    \end{adjustbox}
+    \caption{An excerpt from a BPIC12 case}
+    \label{fig:process-log}
+\end{figure}
+
+Process event logs are typically made available via XES files. XES is an abbreviation for the \textit{eXtensible Event Stream} standard~\cite{gunther2013xes}. An excerpt from a case extracted from the BPIC12 XES file~\cite{BPIC2012} is displayed in \autoref{fig:process-log}. In this particular excerpt, a variety of state transitions are tracked, as evidenced by the values in the \verb=lifecycle:transition= column.\\
+
+Formally, a log $L$ is defined as follows~\cite{Aalst2016}. It is made up of cases $c \in \mathscr{C}$, where $\mathscr{C}$ is the case universe. Similar to events, cases have attributes, e.g., a name. The operator $\#_{attr}(c)$ returns the value of the attribute $attr$ on a case $c$. The function $attribute\_names$ lists the names of all attributes that an event possesses. A mandatory attribute of any case is its trace $\#_{trace}(c)$, which is especially relevant for our work.
+Each trace represents a finite sequence of events $e \in \mathscr{E}$, where $\mathscr{E}$ is the set of all events.
+
+$$ \#_{trace}(c) = \langle e_1, e_2, e_3 \cdots e_n \rangle $$
+
+The events are ordered by timestamp. In turn, each event $e$ has certain attributes associated with it. It is assumed that for a specific process, the type, number, and name of these attributes do not change. An example for common attributes are the activity name $\#_{activity}(e)$ or the timestamp $\#_{timestamp}(e)$ at which the event occurred.
+
+Applied to the example in \autoref{fig:process-log}, $e = \#_{trace}(c)[4]$ would get the fourth event in the trace, and $\#_{concept:name}(e)$ would produce the activity name \verb=W_Completeren aanvraag=.
+Calling $attribute\_names(e)$ would yield \verb=lifecycle:transition=, \verb=concept:name=, \verb=time:timestamp=, and \verb=org:resource=.
+
+These operators enable working with log data, which is at the core of process mining.
+We introduce this domain in the next subsection.
+
+\subsection{Process Mining}\label{sec:process-mining}
+Process mining covers the three steps of process model discovery, conformance checking and process model enhancement \cite{Aalst2016} -  all based on process event logs. It is worth noting that the logs can be enriched with data from systems other than WFMS. The three steps are enabled by techniques from Data science, making it possible to understand process mining as a link between data science and process science. This is also visualized in \autoref{fig:process-data-science}.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=.8\textwidth]{gfx/process-data-science.png}
+    \caption[Process mining connects two disciplines]{Process mining connects process science and data science - the blue line symbolizes the subdomains that predictive process monitoring brings together. Illustration taken from~\cite[p.18]{Aalst2016}}
+    \label{fig:process-data-science}
+\end{figure}
+
+A major problem when discovering process models is posed by spaghetti and lasagna process models~\cite{Aalst2016}. These overly complex and unreadable models are mined from process logs that contain highly variable execution traces. Process mining mainly revolves around process models and the data-driven discovery and optimization based on historical data. For this reason, a possibility to act on case developments in real-time without model-imposed restrictions is desirable. Predictive process monitoring provides this possibility.
+
+\subsection{Predictive Process Monitoring}\label{sec:predictive-process-monitoring}
+Predictive process monitoring is aimed at the use of online data to make statements about the progression of a running case~\cite{francescomarino2015, schoenig2018}. It is not based on process models, but predictive models and thus provides a flexibility that is not available within model-based process mining.  As visualized in \autoref{fig:process-data-science}, predictive process monitoring connects two sub-domains of process science and data science. This makes it a discipline within process mining~\cite{Aalst2016}. With predictive process monitoring, questions such as the following can be answered:
+
+\begin{enumerate}
+    \item Can the service level agreement still be met?
+    \item How long is this case still going to take?
+    \item What is going to be the next step in the case?
+\end{enumerate}
+
+The answers to these questions can give case workers the opportunity to intervene if a case takes an unwanted course or might fail to meet requirements. Furthermore, this approach only requires sufficient amounts of logged case executions to train the predictive models. What this entails is explained in the following chapter.
+
+\section{Predictive Modeling}\label{sec:predictive-modeling}
+Predictive modeling is a domain that deals with creating models from learned statistical properties of data to predict outcomes~\cite{sivaganesan1994predictive}. These models are referred to as predictive models and are not related to process models. This section introduces a common process for predictive model generation in \autoref{sec:predictive-model-development}.
+As we aim to transfer a method from NLP to Predictive process monitoring, we introduce a definition of sequences in \autoref{sec:background:sequences}. Then, we frame the problem in \autoref{sec:background:sequence-prediction} that is fundamental to this thesis: next-element predictions in a sequence.
+
+\subsection{Predictive Model Development}
+\label{sec:predictive-model-development}
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{gfx/kdd-process.pdf}
+    \caption{The process for \textit{Knowledge Discovery in Databases}}
+    \label{fig:kdd_process}
+\end{figure}
+In 1996 Fayyad et al. published what came to be known as the Knowledge Discovery in Databases (KDD) process~\cite{fayyad1996data}. Published over 20 years ago, still relevant today. It is illustrated in \autoref{fig:kdd_process} and shall be explained step by step along with the relevant technical details. The process is highly iterative, is focused intensely on the data, and jumps between every step are possible~\cite{kuhn2013applied}.\\
+
+Predictive models are statistical tools that are used to make predictions. They work on \textit{samples}, which are comprised of a number of \textit{features} - variables that are considered useful for the prediction of the \textit{target variable}. The target variable may either be a continuous or discrete value. In the latter case, the output is referred to as classification. Activities are discrete, and as such this thesis deals with classification. In the exemplary log in \autoref{fig:process-log}, each row can be understood as a sample and each column as a single feature. Features are sometimes also referred to as predictor variables.
+
+\subsubsection*{Selection}
+During the first step of the KDD process in \autoref{fig:kdd_process}, features are chosen as predictors based on differed criteria such as their predictive power or inter-feature correlations. Based on the latter, features can also be omitted from the original dataset.
+
+\subsubsection*{Pre-processing}
+The second step of the KDD process is focused on data quality. Features may be sparse or contain data of low quality, e.g., different spellings of the same entity or typing errors. In this step, these issues are resolved, and appropriate values imputed where they are missing.
+
+\subsubsection*{Transformation}\label{sec:predictive-model-development:transformation}
+The third step of the KDD process is aimed at making the data accessible for machine learning methods. During transformation, some features might be aggregated, normalized or encoded differently to assist the predictive model in picking up relations between variables. Common tasks are one-hot or dictionary encoding of discrete values such as strings, activity names for instance. Variable concatenations or complex aggregations might also be added as \textit{engineered} features~\cite{kuhn2013applied}.
+
+\subsubsection*{Data Mining}
+Data mining deals with the extraction of implicit, previously unknown, and potentially useful information from data. Machine learning provides a technical basis for this~\cite{Aalst2016}. The goal of predicting the next activity is a classification task for which a wide array of predictive models is suitable. A selection of these are decision trees, random forests, support vector machines (SVM) or artificial neural networks (ANN)~\cite{kuhn2013applied}.
+
+The data prepared in the previous steps are used to \textit{train} such a model. During this training phase, the model uses accuracy metrics to assess the accuracy of its predictions and to learn the statistical properties of the data. The models adjust their internals during learning to improve accuracy. The accuracy is calculated on the target labels, i.e. the predictions that the model should produce on known data.
+Certain input parameters of the model are adjusted during this phase as well; an activity referred to as \textit{hyper-parameter tuning}.
+
+\subsubsection*{Evaluation}
+Typically, not all of the available data are used for training. This is to make sure that the model generalizes well, i.e., predicts as good on unseen data as on its training data. If a model is not generalizing, it is said to be \textit{overfitting}. A model is said to be overfitting when it has learned the properties of the training data too well and thus shows poor generalization capabilities. A simple and effective method to avoid bias is to divide the available data into two sets: 75\% as the training set to train the model on, and 25\% of it as the test set to verify the model's performance on unseen data~\cite{kuhn2013applied, lessmannBADS}.
+
+The log data in our use case consists of traces, a type of sequential data.
+We introduce sequences in the next chapter.
+
+\subsection{Sequences}\label{sec:background:sequences}
+This section presents a formal definition of sequences that lays the groundwork for sequence prediction. The definition is according to van der Aalst~\cite{Aalst2016}.
+
+A sequence is made up of ordered, individual steps, which are referred to as items~\cite{han2000freespan}. An item could represent a word, a letter, or anything that can be modeled as a sequence. Each item is an element of the set $\mathscr{I}$ of all items, and each \textit{itemset} $s$ is a subset of $\mathscr{I}$. A \textit{sequence} $seq$ is an ordered list of itemsets:
+
+\begin{equation*}
+\begin{split}
+\mathscr{I} &= \{i_1, i_2, \cdots, i_n\}\\
+        s   &= (x_1,x_2\cdots x_n)\ |\ \forall 0 \leq j \leq n: x_j \in \mathscr{I}\\
+        seq &= \langle s_1,s_2\cdots s_l \rangle\ |\ \forall\ 0 \leq j \leq l: s_j \subseteq \mathscr{I}
+\end{split}
+\end{equation*}
+
+%Then, $S$ defines the infinite set of all possible sequences. It is infinite because sequences can be arbitrarily long, with each itemset containing an arbitrary number of items.
+Subsequences are coherent fragments of sequences.
+For  subsequences, the notation $seq_{i,k}$ denotes that elements from index $i$ through $k$ from the original sequence are contained consecutively: $seq_{1,2} = \langle s_1,s_2 \rangle$. The relationship itself is noted as $seq_{1,2} \sqsubseteq seq$.\\
+
+Under the assumption of the Markovian hypothesis that "the probability of each event depends only on the state attained in the previous event"~\cite{gagniuc2017markov}, a predictive model can be trained on a database of sequences to predict the progress of an individual sequence. This is shown in the next sub-section.
+
+\subsection{Sequence Prediction}\label{sec:background:sequence-prediction}
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=.75\textwidth]{gfx/sequence-prediction-flavors.jpeg}
+    \caption[Flavors of sequence prediction]{The different flavors of sequence prediction. Picture taken from~\cite{web:lstm-effectiveness}}
+    \label{fig:sequence-prediction-flavors}
+\end{figure}
+
+Sequence prediction is a common task in NLP, for example in machine translation. The order of input samples is captured, and the prediction is partially based upon it. There are several flavors of it, mostly depending on the number of inputs and outputs, as illustrated in \autoref{fig:sequence-prediction-flavors}. In this explanation, we focus on many-to-many and many-to-one predictions.
+
+A function $predict$ takes a sequence $seq_{in}$ and gives out an output. The output can be either an itemset $\hat{s}$ or a sequence $\widehat{seq}$, depending on the flavor of sequence prediction. The circumflex marks the output as a prediction~\cite{kuhn2013applied}. The following example shows a many-to-many prediction and a many-to-one prediction.
+
+\begin{equation}
+\begin{split}
+    \widehat{seq_{out}} &= predict(seq_{in})\\
+    \hat{s}             &= predict(seq_{in})
+\end{split}
+\label{eq:prediction-from-sequence}
+\end{equation}
+
+Many-to-many predictions are common in the domains of machine translation. For example, the translation of the sentence \textit{"I am writing my master's thesis"} into the German sentence \textit{"Ich schreibe meine Masterarbeit"} can easily be mapped onto the notation previously described. With the alphabet as $\mathscr{I}$ and each itemset representing a single word, the input and target sequences can be noted as:
+
+\begin{equation*}
+\begin{split}
+           seq_{in} &= \langle(I),(am),(writing),(my),(thesis)\rangle\\
+\widehat{seq_{out}} &= \langle(Ich),(schreibe),(meine),(Masterarbeit)\rangle
+\end{split}
+\end{equation*}
+
+Many-to-one predictions are used to generate text and even write simple novels~\cite{web:text-generation-machinelearningmastery, web:text-generation-freecodecamp}. As the name suggests, they predict the next itemset in a sequence:
+
+\begin{equation*}
+\begin{split}
+seq_{in}  &= \langle(I),(am) (writing),(my)\rangle\\
+\hat{s} &= \langle thesis\rangle
+\end{split}
+\end{equation*}
+
+In this thesis, we focus on many-to-one predictions, because we aim to predict the next activity in a running case based on its trace. How neural networks are especially suited for sequence prediction is explained in the next section.
+
+\section{Artificial Neural Networks}\label{sec:artificial-neural-networks}
+An artificial neural network (ANN) mimics the inner workings of a human brain in that it is made up of connected nodes referred to as neurons. These neurons are interconnected and produce an output signal upon receiving an input signal. This section first gives background on the general structure of a basic neural network in \autoref{sec:feedforward-networks} and then highlights two enhancements for sequence prediction in \autoref{sec:recurrent-networks}.
+We end this section in \autoref{sec:background:cues} with insights into the architectural cues that we use during this thesis.
+
+\subsection{Structural Basics}\label{sec:feedforward-networks}
+The first and most trivial type of ANN is the feedforward neural network~\cite{schmidhuber2015deep}. It is not optimally suited for sequence prediction but serves as a sufficiently complex example to explain the inner workings of an ANN, and for pointing out why long short-term memory networks are more suited for sequence prediction.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=.85\textwidth]{gfx/feedforward-neural-network.png}
+    \caption[A feedforward ANN with a single hidden layer]{A feedforward ANN with a single hidden layer. Illustration taken from~\cite{lessmannBADS}}
+    \label{fig:feedforward-ann}
+\end{figure}
+
+The nodes in any ANN are organized in layers, with each neuron connecting to every neuron in the adjacent layers, resulting in fully connected layers. The samples are fed into the input layer in the form of a vector of features. The prediction ultimately comes out of the output layer. The layers between the input and output layers are referred to as \textit{hidden layers} and can be greater in number.
+
+\autoref{fig:feedforward-ann} shows an exemplary ANN with a single hidden layer. The features $x_1$ to $x_m$ are fed into the network as one vector, and their numeric values are passed along the edges to every neuron in the next layer. For each neuron, the incoming values are multiplied with the respective edge weight $\beta$ and summed up, as depicted by the $\sum$ symbol in each circle. The sum is passed to a function called \textit{activation function} - illustrated by the sigmoid curve - which controls whether the neuron emits a signal or not. The signals are passed along the output edges of the respective neurons, and the process is repeated for the next layer until the signals have reached the output layer.
+This process of continually feeding the outputs forward to the next layer also gives this type of hidden layer its name: feedforward layer.
+
+The weights $\beta$ are adjusted during training to increase prediction accuracy. For this purpose, the training samples are grouped into \textit{batches}. The samples in a batch are passed into the network, and the predictions for this batch are compared to the target labels. At this point, the \textit{loss function} calculates how far the network's predictions missed the labels. The weights are then adjusted to reduce the loss in the next batch. When all batches have passed through the network once, an \textit{epoch} has elapsed. Because the goal of the training algorithm is to minimize the network's loss, the weights can be adapted too well to the training set. This can happen when the network is trained for too long, making it overfit.
+
+Overfitting an ANN during training can be avoided by calculating the network's loss both on the training set as well as on the test set. The weight adjustments are made based on the loss on the training set, but the training is stopped once the loss on the test set has ceased to improve for a certain number of epochs. This technique is referred to as early stopping.\\
+
+Because feedforward layers are passing their outputs toward the output layer, and the neurons have no memory, this type of layer does not have any capacity for persisting what it has previously processed. However, this is a desirable capability for sequence predictions, as several samples can belong to a single sequence.
+
+The next subsection shows how recurrent neural networks (RNNs) have been created with this capacity in mind, making them suited for working with sequential data. Long short-term memory builds on RNNs and enhances the capacity to remember even further.
+
+\FloatBarrier
+\subsection{Enhancements for Sequence Prediction}\label{sec:recurrent-networks}
+The layers in a recurrent neural network (RNN) implement a feedback loop. This loop makes information from the output of a neuron available to itself for the next step. Introducing a time dimension, RNNs are often displayed in an unrolled fashion as in \autoref{fig:rnn-unrolled}. This form of illustration also reveals that recurrent neural networks are intimately related to sequences and lists.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=.9\textwidth]{gfx/rnn-unrolled.png}
+    \caption[An unrolled neuron of an ANN]{An unrolled neuron of an ANN, taken from~\cite{web:colah}}
+    \label{fig:rnn-unrolled}
+\end{figure}
+
+A neuron receives an input $x_t$ and outputs a value $h_t$. The letter $t$ indicates the time dimension. By showing the neuron in an unrolled fashion, it becomes visible that the output of the neuron at time $t$ becomes available to itself at time $t+1$~\cite{web:colah}.
+
+The introduction of the time dimension causes the perception of input data to change: It is now required to be three-dimensional. With feedforward ANNs, training data was two-dimensional and consisted of a list of independent samples. Samples were the same as a feature vector, but for RNNs, samples need to be understood as lists of feature vectors. This makes a sample suitable to represent a sequence because its feature vectors can represent the individual timesteps.
+
+While the loop in an RNN indeed allows recognizing short-term dependencies, the network as a whole will still underperform with long-term dependencies when the gaps between related inputs become too big. The root cause is that RNNs only loop back inputs, and lack memory to bridge those gaps. This problem has been thoroughly explored by Hochreiter et al.~\cite{hochreiter1991untersuchungen} who also proposed the long short-term memory fix presented in the following.
+
+\subsubsection*{Long Short-Term Memory}\label{sec:lstm}
+In recent years, RNNs were applied with great success to a variety of problems: speech recognition, language modeling or translation. This success can be attributed in part to the enhancement of RNNs with long short-term memory (LSTM) cells~\cite{jozefowicz2015empirical,kuhn2013applied,schmidhuber2015deep}.
+
+Hochreiter \& Schmidhuber published this enhancement in 1997~\cite{hochreiter1997} which now sees broad application. Essentially, the repeating neurons of an RNN are turned into cells by equipping them with a cell state $C$, that provides them with the capacity to remember.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\textwidth]{gfx/lstm-chain.png}
+    \caption[An unrolled LSTM cell and its architecture]{An unrolled LSTM cell and its architecture. Illustration taken from~\cite{web:colah}}
+    \label{fig:lstm}
+\end{figure}
+
+\autoref{fig:lstm} showcases the architecture of an unrolled LSTM cell. In the diagram, each line carries an entire vector. The pink circles represent pointwise operations, like vector addition. Yellow boxes symbolize operations. Merging lines denote concatenation, while a forking line denotes copying its content in both directions. The cell state $C$ is symbolized by the horizontal upper line running from left to right. The lower line on the left represents $h_{t-1}$, the output of the cell in the previous step.
+
+The $\sigma$ boxes represent gates. Which parts of $C_{t-1}$ to keep and what to forget is decided at the first gate from the left, by taking $h_{t-1}$ and $x_t$ into account. The following $\sigma$ gate and $tanh$ operator together create the update to $C_{t-1}$. Finally, on the right, the updated cell state $C_t$ is used together with the activation function $tanh$ to produce the output $h_t$. Variants of this original LSTM cell architecture exist, with most modifications made around the construction of the state $C$ - all exhibiting similar performance~\cite{greff2017lstm}.\\
+
+The types of networks layers presented until here can be freely combined inside a network architecture.
+For instance, a feedforward layer can be attached to an LSTM layer.
+In our work, we apply several architectural cues besides the combination of different network types.
+These are explained in the following subsections.
+
+\subsection{Architectural Cues}\label{sec:background:cues}
+A neural network architecture is seldomly comprised only out of feedforward or recurrent layers.
+Typically, the layers are augmented with activation functions and other types of layers to improve accuracy.
+In our work, we make use of Dropout layers and Embedding layers, which we present in the following.
+Furthermore, we employ activation functions to speed up learning and implement the classification output.
+
+\subsubsection*{Dropout Layers}
+As we outlined in the beginning of this section, ANNs implement an optimization function.
+This optimization naturally makes the network prone to overfit.
+The use of dropout layers presents a simple, yet effective technique to avoid overfitting.
+By breaking the connection between adjacent neurons with a given probability of $p$, the network learns more robust features.
+Dropout also approximately doubles the number of iterations required to converge but decreases training for an epoch~\cite{srivastava2014dropout}.
+\autoref{fig:dropout-application} illustrates the effects of dropout application between two layers.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth]{gfx/dropout-application.png}
+  \caption[Effects of applying dropout]{The effects of applying dropout. Illustration taken from~\cite{srivastava2014dropout}}
+  \label{fig:dropout-application}
+\end{figure}
+
+\subsubsection*{Embedding layers}
+Embedding layers make it possible to use word embeddings.
+Embeddings map inputs to a continuous vector space.
+The layer weights are often imported from pretrained embeddings, as is explained in depth in \autoref{sec:categorical-feature-engineering}.
+
+\subsubsection*{Softmax activation}
+The softmax activation is useful for converting the output of a network into a classification.
+As outlined in the beginning of this section, an activation function determines the output of a neuron.
+
+The softmax function normalizes the output $y_i$ of a neuron $i$ to a value between 0 and 1:
+
+$$S(y_i) = \frac{e^{y_i}}{\sum_j e^{y_j}}$$
+
+The sum of all output values of all neurons in a softmax-activated layer always equals 1.
+A is understood as the placeholder of a single class, and its output is interpreted as the probability of this class.
+The neuron with the highest probability reveals the prediction of the network.
+
+\subsubsection*{Rectified Linear Unit Activation}
+The rectified linear unit (ReLU) function has become a popular choice for activating hidden layers~\cite{glorot2011deep}. It is defined as follows:
+
+$$ReLU(y_i) = y_i^+ = max(0, y_i)$$
+
+They are biologically plausible, giving a one-sided output.
+Also, they activate sparsely. In a randomly initialized network, only about half of all hidden units are activated.
+Combined with the simple calculation of the function, the activation function makes for efficient computation~\cite{krizhevsky2012imagenet}.
+
+\section{Data Preparation and Feature Engineering}
+\label{sec:background:feature-engineering}
+Data preparation and feature engineering are the tasks in predictive model development that demand the most effort and have the greatest impact on prediction accuracy~\cite{kuhn2013applied}. To assist predictive models during training, most features need to be reformatted. This requirement comes with an implication that can also harm model performance, which is explained in \autoref{sec:background:curse-of-dimensionality}.
+Then, relevant methods used for categorical variables are presented in \autoref{sec:categorical-feature-engineering}. \autoref{sec:sequential-feature-engineering} points out methods with which to make sequential inputs of various length conform with the fixed-width input requirement of predictive models. In the case of ANNs, this requirement can easily be explained by the fixed number of units on the input layer. The methods are demonstrated in the example of the following two sequences:
+\begin{equation*}
+    \begin{split}
+        seq1 &= \langle(Arthur),(is),(the),(king)\rangle\\
+        seq2 &= \langle(Maria),(wants),(to),(be),(the),(queen)\rangle
+    \end{split}
+\end{equation*}
+
+\subsection{The Curse of Dimensionality}\label{sec:background:curse-of-dimensionality}
+\begin{figure}
+    \centering
+    \includegraphics[width=.75\textwidth]{gfx/dimensionality_vs_performance.png}
+    \caption[A visualization of the curse of dimensionality]{Adding features to the feature space does not improve model performance indefinitely}
+    \label{fig:dimensionality-vs-performance}
+\end{figure}
+The curse of dimensionality describes a phenomenon that arises when using more and more features~\cite{Aalst2016} with a constant number of samples negatively impacts accuracy on test data. It appears across various domains such as combinatorics, sampling optimization, and machine learning, and is especially prominent when features are engineered.
+
+The increase in dimensionality caused by the number of features increases the size of the solution space. A greater solution space eventually causes problems for machine learning algorithms which require statistic significance, making the algorithm less accurate. To counter this effect, more training data would be necessary. Thus, increasing the number of features for training a predictive model only improves accuracy to a certain extent when the number of samples is constant. This relationship is illustrated in \autoref{fig:dimensionality-vs-performance}.
+
+\subsection{Feature Engineering for Categorical Features}\label{sec:categorical-feature-engineering}
+While ordinal features are most often normalized, categorical features can be encoded in a variety of ways. Categorical features could be strings like \textit{red} and \textit{black}, which have no numerical format and may or may not be relative to each other. Where one-hot and dictionary encodings are traditional approaches for these features, word embeddings represent a relatively new and promising approach.
+
+\subsubsection*{One-hot Encoding}
+One-hot encoding is often used for features which have a small to medium-sized number of unique values. Each feature is expanded to an $n$ column representation, where $n$ represents the number all possible values, also referred to as the alphabet. The columns hold boolean flags, of which only one is ever true in any given row. This type of encoding is also sometimes referred to as "dummy encoding"~\cite{web:pandas-get-dummies}. Thus, the first word of $seq1$ would be encoded as in \autoref{tab:one-hot}. As the alphabet becomes larger, $n$ increases and the feature vector becomes more sparse. Sparse is a word used to describe data which mostly contains zeros. This characteristic can easily cause symptoms of the curse of dimensionality to appear, which is why it is not used for very large $n$.
+
+\begin{table}[ht]
+    \centering
+    \begin{tabular}{c|c|c|c|c|c|c|c|c}
+        Maria & Arthur & is & wants & to & king & be & the & queen\\
+        \midrule
+        0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    \end{tabular}
+    \caption[One-hot encoding of "Arthur"]{One-hot encoding of "Arthur" from alphabet of $seq1$ and $seq2$}
+    \label{tab:one-hot}
+\end{table}
+
+\subsubsection*{Dictionary Encoding}
+Widely used in compression, within in-memory database systems~\cite{plattner2012memory} for example, dictionary encoding is also used to encode categorical values. Since predictive models only process numerical values, dictionary encoding is used to create a look-up table and map every value of a feature to a numeric code, like in \autoref{tab:dictionary-encoding}.
+
+In contrast to one-hot encoding, this dictionary encoding does not result in wide and sparse inputs, making it suitable for features with a large number of distinct features. However, it has one important ramification: It imposes order on features which previously might not have had one. In our example, the condition $Maria > Arthur$ holds after encoding. The dictionary-encoded sequences would look like this:
+\begin{equation*}
+    \begin{split}
+        seq1 &= \langle1\ 2\ 7\ 5\rangle\\
+        seq2 &= \langle0\ 3\ 4\ 6\ 7\ 8\rangle
+    \end{split}
+\end{equation*}
+
+\begin{table}
+    \centering
+    \begin{tabular}{c|ccccccccc}
+        Word & Maria & Arthur & is & wants & to & king & be & the & queen\\
+        \midrule
+        Code & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8
+    \end{tabular}
+    \caption{The dictionary built from the $seq1$ and $seq2$}
+    \label{tab:dictionary-encoding}
+\end{table}
+
+\subsubsection*{Word Embedding}
+Because dictionary encodings impose order and one-hot encodings lead to sparse data, word embeddings are perceived as a viable alternative for encoding categorical variables. Word embeddings are rooted in NLP, where applications deal with very large alphabets.
+
+A word embedding is the output of a neural network with a single hidden layer that has been trained on a large, dictionary-encoded text corpus. It detects how words relate to each other and puts out highly dimensional vectors for each word~\cite{web:word-embedding}. These represent any word property that the model has picked up. In the following example from~\cite{mikolov2013distributed}, the network was able to detect gender properties and social semantics of words:
+
+$$
+\vec{v}_{king} - \vec{v}_{man} + \vec{v}_{women} = \vec{v}_{queen}
+$$
+
+A word embedding thus allows clustering of words by specific properties. Made famous by Google, word embeddings have motivated numerous publications~\cite{web:ahogrammer, goldberg2014word2vec}. Word embeddings are often available pre-trained on extensive text databases, like Wikipedia. To use such a pre-trained embedding, the weights from it can be loaded into the respective layer before training the network.
+
+\subsection{Feature Engineering for Sequences}\label{sec:sequential-feature-engineering}
+Predictive model inputs take in feature vectors of fixed size. As shown, sequences can be of arbitrary length, and thus these two requirements collide. To bring variable length inputs into a usable format for predictive models, several methods of formatting have been invented. As some of their names suggest, these come from the domain of natural language processing (NLP), but can easily be transferred to the problem at hand.
+
+\subsubsection*{Sliding Window}
+The sliding window format is widespread in the areas of NLP and Time Series Forecasting. The sequences are divided into chunks of width $c$. Chunking results in several input tuples for every sequence and creates the desired tabular format for feeding into the model - illustrated in \autoref{tab:sliding-window}.
+
+\begin{table}
+    \centering
+    \begin{tabular}{cc}
+        Word 1 & Word 2\\
+        \midrule
+        Arthur & is\\
+        is & the\\
+        the & king\\
+        Maria & wants\\
+        wants & to\\
+        to & be\\
+        be & the\\
+        the & queen
+    \end{tabular}
+    \caption{Windows created from $seq1$ and $seq2$ with $c=2$}
+    \label{tab:sliding-window}
+\end{table}
+
+\subsubsection*{Bag-of-words}
+The bag-of-words (BOW) encoding produces $l$ input tuples, where $l$ is the length of the encoded sequence. Similarly to one-hot encoding, the alphabet needs to be known. One arrives at the encoding by marking the occurrence of each item in the alphabet for each subsequence $seq_{1,k}$. $k$ is incremented for every sample from 1 to $l$, making the feature vector fill up with truth values as $k$ increases. As \autoref{tab:bow-encoding} evidences, this type of encoding results in sparse data, too.
+
+\begin{table}
+    \centering
+    \begin{tabular}{c|ccccccccc}
+        Sequence & Maria & Arthur & is & wants & to & king & be & the & queen\\
+        \midrule
+        $seq1_{1,1}$ & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+        $seq1_{1,2}$ & 0 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+        $seq1_{1,3}$ & 0 & 1 & 1 & 0 & 0 & 0 & 0 & 1 & 0\\
+        $seq1_{1,4}$ & 0 & 1 & 1 & 0 & 0 & 1 & 0 & 1 & 0\\
+        \hline
+        $seq2_{1,1}$ & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+        $seq2_{1,2}$ & 1 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+        $seq2_{1,3}$ & 1 & 0 & 0 & 1 & 1 & 0 & 0 & 0 & 0\\
+        $seq2_{1,4}$ & 1 & 0 & 0 & 1 & 1 & 0 & 1 & 0 & 0\\
+        $seq2_{1,5}$ & 1 & 0 & 0 & 1 & 1 & 0 & 1 & 1 & 0\\
+        $seq2_{1,5}$ & 1 & 0 & 0 & 1 & 1 & 0 & 1 & 1 & 1\\
+    \end{tabular}
+    \caption{Bag-of-words encoding for $seq1$ and $seq2$}
+    \label{tab:bow-encoding}
+\end{table}
+\subsubsection*{$n$-grams}
+The $n$-gram approach is very popular in computational linguistics, biology and data compression and is effectively an $(n-1)$-order Markov model, with the most popular choices for $n$ being $1,2$ and $3$. These models would be called \textit{unigram}, \textit{bigram} and \textit{trigram} models.
+
+Similar to BOW, an $n$-gram model counts occurrences. Different from BOW, it tracks the occurrence of subsequences of length $n$. Suppose a set $LS$ holds all possible values of a single feature. From $LS$, a feature set $FS$ is constructed with every item being a permutation of length $n$. A feature in this set would be referred to as \textit{gram}, and can also be understood as a possible subsequence.
+
+$$
+FS = S(LS, n)
+$$
+
+While $n$-grams can be powerful features to use, their high dimensionality causes high computational loads and sparse data. With the small feature set of 9 words in the given example, a feature vector using tri-grams would already be $\frac{|FS|!}{(|FS|-n)!}=504$ elements wide.
+
+\subsubsection*{Subsequence Mining}
+One of the main weaknesses of $n$-grams is the restriction to a single $n$ and that "one may need to examine a combinatorially explosive
+number of possible subsequence patterns" \cite{pei2001prefixspan}. For this reason, approaches have been developed that combine the benefit of $n$-grams with more flexibility by avoiding the limitation to $n$. An algorithm sifts through input sequences and detects sequential patterns of any length. These sequences are then encoded, resulting in line items similar to the ones in \autoref{tab:bow-encoding} The respective boolean entry denotes that a specific subsequence has occurred in the sequence.
+Examples for these algorithms are GSP \cite{srikant1996gsp}, FreeSpan \cite{han2000freespan} and PrefixSpan \cite{pei2001prefixspan}.\\
+
+For every mined subsequence $ss$, the \textit{support} metric $supp(ss)$ can be calculated. This metric indicates in how many complete sequences, $ss$ occurs as a subsequence. Sometimes, shorter subsequences are part of longer subsequences, like $ss1$ is contained in $ss2$:
+
+\begin{equation*}
+\begin{split}
+s1 &= \langle a,d \rangle\\
+s2 &= \langle a,d,c \rangle
+\end{split}
+\end{equation*}
+
+If the condition $supp(ss1) > supp(ss2)$ holds true, then $ss1$ is called a \textit{closed} subsequence as it can not be expanded without shrinking its support.
