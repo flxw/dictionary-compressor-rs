@@ -5,6 +5,8 @@ First version:
 - replace word with map key
 - write out compressed file along with decompression map
 
+- Tokenize words better, currently they are just split by whitespaces
+
 Second version:
 - stream file word by word
 
